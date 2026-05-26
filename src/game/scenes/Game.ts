@@ -44,7 +44,7 @@ export class Game extends Scene
         this.createMapTextures();
 
         this.camera = this.cameras.main;
-        this.camera.setBackgroundColor(0x2a4858);
+        this.camera.setBackgroundColor(0x1c262e);
         this.camera.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
         this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
@@ -77,10 +77,12 @@ export class Game extends Scene
         this.camera.roundPixels = true;
         this.camera.centerOn(spawnX, spawnY);
 
+        this.createSadAtmosphere();
+
         this.add.text(18, 18, 'Deplacement: fleches clavier', {
             fontFamily: 'Arial',
             fontSize: 22,
-            color: '#ffffff',
+            color: '#d7dde0',
             stroke: '#000000',
             strokeThickness: 4
         }).setScrollFactor(0).setDepth(2000);
@@ -93,11 +95,11 @@ export class Game extends Scene
         if (!this.textures.exists('grass-tile'))
         {
             const grass = this.add.graphics();
-            grass.fillStyle(0x5f9b4e, 1);
+            grass.fillStyle(0x697563, 1);
             grass.fillRect(0, 0, 64, 64);
-            grass.fillStyle(0x6ead57, 1);
+            grass.fillStyle(0x74806d, 1);
             grass.fillRect(0, 0, 64, 32);
-            grass.fillStyle(0x4b8b40, 1);
+            grass.fillStyle(0x5b6457, 1);
             grass.fillRect(12, 8, 6, 6);
             grass.fillRect(44, 34, 5, 5);
             grass.fillRect(30, 52, 6, 6);
@@ -108,9 +110,9 @@ export class Game extends Scene
         if (!this.textures.exists('path-tile'))
         {
             const path = this.add.graphics();
-            path.fillStyle(0xa88a62, 1);
+            path.fillStyle(0x8a806f, 1);
             path.fillRect(0, 0, 64, 64);
-            path.fillStyle(0x93744f, 1);
+            path.fillStyle(0x73695d, 1);
             path.fillRect(8, 10, 6, 6);
             path.fillRect(42, 24, 6, 6);
             path.fillRect(24, 46, 8, 8);
@@ -121,9 +123,9 @@ export class Game extends Scene
         if (!this.textures.exists('wall-block'))
         {
             const wall = this.add.graphics();
-            wall.fillStyle(0x7f7368, 1);
+            wall.fillStyle(0x676764, 1);
             wall.fillRect(0, 0, 64, 64);
-            wall.lineStyle(2, 0x5d534b, 1);
+            wall.lineStyle(2, 0x4f4e4c, 1);
             wall.strokeRect(2, 2, 60, 60);
             wall.lineBetween(32, 0, 32, 64);
             wall.lineBetween(0, 32, 64, 32);
@@ -134,11 +136,11 @@ export class Game extends Scene
         if (!this.textures.exists('tree-oak'))
         {
             const tree = this.add.graphics();
-            tree.fillStyle(0x5b3a28, 1);
+            tree.fillStyle(0x4a3d35, 1);
             tree.fillRect(26, 54, 12, 18);
-            tree.fillStyle(0x2f6b3b, 1);
+            tree.fillStyle(0x56645b, 1);
             tree.fillCircle(32, 30, 26);
-            tree.fillStyle(0x3c7d47, 1);
+            tree.fillStyle(0x646f67, 1);
             tree.fillCircle(22, 24, 12);
             tree.fillCircle(41, 22, 11);
             tree.generateTexture('tree-oak', 64, 80);
@@ -148,15 +150,18 @@ export class Game extends Scene
         if (!this.textures.exists('house-small'))
         {
             const house = this.add.graphics();
-            house.fillStyle(0x8f6446, 1);
+            house.fillStyle(0x74685f, 1);
             house.fillRect(16, 38, 96, 64);
-            house.fillStyle(0xc86c3e, 1);
+            house.fillStyle(0x7f6558, 1);
             house.fillTriangle(8, 40, 120, 40, 64, 6);
-            house.fillStyle(0x5f3d2b, 1);
+            house.fillStyle(0x584740, 1);
             house.fillRect(56, 66, 16, 36);
-            house.fillStyle(0x9fd4ec, 1);
+            house.fillStyle(0x515961, 1);
             house.fillRect(28, 58, 18, 16);
             house.fillRect(82, 58, 18, 16);
+            house.lineStyle(2, 0x43484d, 1);
+            house.strokeRect(28, 58, 18, 16);
+            house.strokeRect(82, 58, 18, 16);
             house.generateTexture('house-small', 128, 110);
             house.destroy();
         }
@@ -373,6 +378,41 @@ export class Game extends Scene
             .setBlendMode(BlendModes.ADD)
             .setVisible(false)
             .setDepth(y - 1);
+    }
+
+    createSadAtmosphere ()
+    {
+        const fogPatches = [
+            { x: 540, y: 420, width: 420, height: 140, alpha: 0.12 },
+            { x: 1260, y: 260, width: 520, height: 170, alpha: 0.14 },
+            { x: 1960, y: 620, width: 440, height: 150, alpha: 0.1 },
+            { x: 880, y: 1220, width: 560, height: 180, alpha: 0.09 }
+        ];
+
+        fogPatches.forEach((patch) =>
+        {
+            this.add.ellipse(patch.x, patch.y, patch.width, patch.height, 0xc8d0d5, patch.alpha)
+                .setDepth(1400);
+        });
+
+        this.add.ellipse(1380, 180, 620, 160, 0x8f969d, 0.18)
+            .setDepth(1450);
+        this.add.ellipse(1710, 220, 300, 90, 0x959ba1, 0.12)
+            .setDepth(1451);
+
+        this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x5d6772, 0.12)
+            .setDepth(1490);
+
+        this.add.rectangle(512, 384, 1024, 768, 0x3f4952, 0.2)
+            .setScrollFactor(0)
+            .setDepth(3000);
+
+        this.add.rectangle(512, 60, 1024, 120, 0x2d3338, 0.18)
+            .setScrollFactor(0)
+            .setDepth(3001);
+        this.add.rectangle(512, 708, 1024, 120, 0x2d3338, 0.12)
+            .setScrollFactor(0)
+            .setDepth(3001);
     }
 
     revealLampIfDiscovered ()

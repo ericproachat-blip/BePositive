@@ -1,5 +1,5 @@
 import { EventBus } from '../EventBus';
-import { Scene } from 'phaser';
+import { BlendModes, Math as PhaserMath, Scene } from 'phaser';
 
 export class Game extends Scene
 {
@@ -7,6 +7,12 @@ export class Game extends Scene
     cursors: Phaser.Types.Input.Keyboard.CursorKeys;
     player: Phaser.Physics.Arcade.Sprite;
     obstacles: Phaser.Physics.Arcade.StaticGroup;
+    lamp: Phaser.GameObjects.Sprite;
+    lampGlow: Phaser.GameObjects.Arc;
+    lampVisible: boolean;
+    lampActivated: boolean;
+    lampTriggerDistance: number;
+    lampRevealYThreshold: number;
     moveSpeed: number;
     worldWidth: number;
     worldHeight: number;
@@ -18,6 +24,10 @@ export class Game extends Scene
         this.moveSpeed = 220;
         this.worldWidth = 2560;
         this.worldHeight = 1792;
+        this.lampVisible = false;
+        this.lampActivated = false;
+        this.lampTriggerDistance = 64;
+        this.lampRevealYThreshold = 520;
     }
 
     create ()
@@ -35,7 +45,12 @@ export class Game extends Scene
         this.obstacles = this.physics.add.staticGroup();
         this.buildVillage();
 
-        this.player = this.physics.add.sprite(320, this.worldHeight - 260, 'player-char');
+        this.createLamp(1280, 220);
+
+        const spawnX = this.worldWidth / 2;
+        const spawnY = this.worldHeight / 2;
+
+        this.player = this.physics.add.sprite(spawnX, spawnY, 'player-char');
         this.player.setScale(1);
         this.player.setCollideWorldBounds(true);
         this.player.setSize(24, 26);
@@ -45,9 +60,11 @@ export class Game extends Scene
         this.physics.add.collider(this.player, this.obstacles);
 
         this.cursors = this.input.keyboard.createCursorKeys();
+        this.input.keyboard?.addCapture(['UP', 'DOWN', 'LEFT', 'RIGHT']);
 
         this.camera.startFollow(this.player, true, 0.14, 0.14);
         this.camera.roundPixels = true;
+        this.camera.centerOn(spawnX, spawnY);
 
         this.add.text(18, 18, 'Deplacement: fleches clavier', {
             fontFamily: 'Arial',
@@ -156,6 +173,102 @@ export class Game extends Scene
             player.generateTexture('player-char', 48, 48);
             player.destroy();
         }
+
+        if (!this.textures.exists('lamp-off'))
+        {
+            const lampOff = this.add.graphics();
+            lampOff.fillStyle(0x5f5f5f, 1);
+            lampOff.fillRect(28, 24, 8, 40);
+            lampOff.fillStyle(0x2e2e2e, 1);
+            lampOff.fillCircle(32, 20, 10);
+            lampOff.fillStyle(0x1c1c1c, 1);
+            lampOff.fillCircle(32, 20, 6);
+            lampOff.generateTexture('lamp-off', 64, 64);
+            lampOff.destroy();
+        }
+
+        if (!this.textures.exists('lamp-on'))
+        {
+            const lampOn = this.add.graphics();
+            lampOn.fillStyle(0x5f5f5f, 1);
+            lampOn.fillRect(28, 24, 8, 40);
+            lampOn.fillStyle(0x2e2e2e, 1);
+            lampOn.fillCircle(32, 20, 10);
+            lampOn.fillStyle(0xffdd7a, 1);
+            lampOn.fillCircle(32, 20, 6);
+            lampOn.generateTexture('lamp-on', 64, 64);
+            lampOn.destroy();
+        }
+    }
+
+    createLamp (x: number, y: number)
+    {
+        this.lamp = this.add.sprite(x, y, 'lamp-off').setDepth(y + 1).setVisible(false);
+        this.lampGlow = this.add.circle(x, y - 8, 88, 0xffde8a, 0.34)
+            .setBlendMode(BlendModes.ADD)
+            .setVisible(false)
+            .setDepth(y - 1);
+    }
+
+    revealLampIfDiscovered ()
+    {
+        if (this.lampVisible)
+        {
+            return;
+        }
+
+        // The lamp is hidden at first and appears only once the player explores upper map.
+        if (this.player.y <= this.lampRevealYThreshold)
+        {
+            this.lampVisible = true;
+            this.lamp.setVisible(true);
+        }
+    }
+
+    activateLamp ()
+    {
+        if (this.lampActivated)
+        {
+            return;
+        }
+
+        this.lampActivated = true;
+        this.lamp.setTexture('lamp-on');
+        this.lampGlow.setVisible(true);
+        this.lampGlow.setScale(0.5);
+
+        this.tweens.add({
+            targets: this.lampGlow,
+            alpha: { from: 0.15, to: 0.42 },
+            scale: { from: 0.5, to: 1 },
+            duration: 500,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: this.lampGlow,
+            alpha: { from: 0.42, to: 0.28 },
+            duration: 900,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+    }
+
+    checkLampProximity ()
+    {
+        if (!this.lampVisible || this.lampActivated)
+        {
+            return;
+        }
+
+        const distance = PhaserMath.Distance.Between(this.player.x, this.player.y, this.lamp.x, this.lamp.y);
+
+        // Trigger automatically at one tile distance.
+        if (distance <= this.lampTriggerDistance)
+        {
+            this.activateLamp();
+        }
     }
 
     drawGround ()
@@ -256,24 +369,26 @@ export class Game extends Scene
         body.setVelocity(0);
 
         // 4-direction movement only (no jump, no diagonal) at constant speed.
-        if (this.cursors.left.isDown)
+        if (this.cursors.left?.isDown)
         {
             body.setVelocityX(-this.moveSpeed);
         }
-        else if (this.cursors.right.isDown)
+        else if (this.cursors.right?.isDown)
         {
             body.setVelocityX(this.moveSpeed);
         }
-        else if (this.cursors.up.isDown)
+        else if (this.cursors.up?.isDown)
         {
             body.setVelocityY(-this.moveSpeed);
         }
-        else if (this.cursors.down.isDown)
+        else if (this.cursors.down?.isDown)
         {
             body.setVelocityY(this.moveSpeed);
         }
 
         this.player.setDepth(this.player.y);
+        this.revealLampIfDiscovered();
+        this.checkLampProximity();
     }
 
     changeScene ()

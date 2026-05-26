@@ -14,7 +14,13 @@ function App()
     const changeScene = () => {
 
         if(phaserRef.current)
-        {     
+        {
+            if (phaserRef.current.game)
+            {
+                phaserRef.current.game.scene.start('Game');
+                return;
+            }
+
             const scene = phaserRef.current.scene as MainMenu;
             
             if (scene)

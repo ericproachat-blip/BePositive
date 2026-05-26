@@ -13,6 +13,11 @@ export class Game extends Scene
     lampActivated: boolean;
     lampTriggerDistance: number;
     lampRevealYThreshold: number;
+    npc: Phaser.GameObjects.Sprite;
+    npcTears: Phaser.GameObjects.Arc[];
+    npcSadTweens: Phaser.Tweens.Tween[];
+    npcIsHappy: boolean;
+    npcTriggerDistance: number;
     moveSpeed: number;
     worldWidth: number;
     worldHeight: number;
@@ -28,6 +33,10 @@ export class Game extends Scene
         this.lampActivated = false;
         this.lampTriggerDistance = 64;
         this.lampRevealYThreshold = 520;
+        this.npcTears = [];
+        this.npcSadTweens = [];
+        this.npcIsHappy = false;
+        this.npcTriggerDistance = 84;
     }
 
     create ()
@@ -56,6 +65,8 @@ export class Game extends Scene
         this.player.setSize(24, 26);
         this.player.setOffset(12, 20);
         this.player.setDepth(this.player.y);
+
+        this.createNpc(1540, 980);
 
         this.physics.add.collider(this.player, this.obstacles);
 
@@ -199,6 +210,160 @@ export class Game extends Scene
             lampOn.generateTexture('lamp-on', 64, 64);
             lampOn.destroy();
         }
+
+        if (!this.textures.exists('npc-sad'))
+        {
+            const npcSad = this.add.graphics();
+            npcSad.fillStyle(0x2b2b2b, 0.22);
+            npcSad.fillEllipse(24, 50, 24, 8);
+
+            npcSad.fillStyle(0xf2c7a2, 1);
+            npcSad.fillCircle(24, 14, 10);
+
+            npcSad.fillStyle(0x4d5a7a, 1);
+            npcSad.fillRect(13, 24, 22, 16);
+            npcSad.fillStyle(0x3c455f, 1);
+            npcSad.fillRect(14, 40, 9, 9);
+            npcSad.fillRect(25, 40, 9, 9);
+
+            npcSad.fillStyle(0x1e1e1e, 1);
+            npcSad.fillRect(19, 14, 2, 2);
+            npcSad.fillRect(27, 14, 2, 2);
+            npcSad.fillRect(18, 21, 12, 2);
+
+            npcSad.generateTexture('npc-sad', 48, 56);
+            npcSad.destroy();
+        }
+
+        if (!this.textures.exists('npc-happy'))
+        {
+            const npcHappy = this.add.graphics();
+            npcHappy.fillStyle(0x2b2b2b, 0.22);
+            npcHappy.fillEllipse(24, 50, 24, 8);
+
+            npcHappy.fillStyle(0xf2c7a2, 1);
+            npcHappy.fillCircle(24, 14, 10);
+
+            npcHappy.fillStyle(0x4ea86e, 1);
+            npcHappy.fillRect(13, 24, 22, 16);
+            npcHappy.fillStyle(0x3a7e54, 1);
+            npcHappy.fillRect(14, 40, 9, 9);
+            npcHappy.fillRect(25, 40, 9, 9);
+
+            npcHappy.fillStyle(0x1e1e1e, 1);
+            npcHappy.fillRect(19, 14, 2, 2);
+            npcHappy.fillRect(27, 14, 2, 2);
+            npcHappy.fillRect(20, 21, 8, 2);
+            npcHappy.fillRect(18, 20, 2, 2);
+            npcHappy.fillRect(28, 20, 2, 2);
+
+            npcHappy.generateTexture('npc-happy', 48, 56);
+            npcHappy.destroy();
+        }
+    }
+
+    createNpc (x: number, y: number)
+    {
+        this.npc = this.add.sprite(x, y, 'npc-sad').setDepth(y);
+        this.npc.setAngle(12);
+        this.npc.setScale(1, 0.96);
+
+        const leftTear = this.add.circle(x - 6, y - 14, 2, 0x8cc7ff, 0.95).setDepth(y + 2);
+        const rightTear = this.add.circle(x + 6, y - 14, 2, 0x8cc7ff, 0.95).setDepth(y + 2);
+        this.npcTears = [leftTear, rightTear];
+
+        this.npcSadTweens = this.npcTears.map((tear, index) =>
+        {
+            const baseY = tear.y;
+            const baseX = tear.x;
+
+            return this.tweens.add({
+                targets: tear,
+                y: baseY + 12,
+                alpha: { from: 0.95, to: 0.15 },
+                duration: 420 + (index * 70),
+                repeat: -1,
+                ease: 'Linear',
+                onRepeat: () =>
+                {
+                    tear.y = baseY;
+                    tear.x = baseX + PhaserMath.Between(-1, 1);
+                    tear.alpha = 0.95;
+                }
+            });
+        });
+
+        this.npcSadTweens.push(this.tweens.add({
+            targets: this.npc,
+            angle: { from: 10, to: 14 },
+            duration: 850,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        }));
+    }
+
+    checkNpcProximity ()
+    {
+        if (this.npcIsHappy || !this.npc)
+        {
+            return;
+        }
+
+        const distance = PhaserMath.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
+
+        if (distance <= this.npcTriggerDistance)
+        {
+            this.makeNpcHappy();
+        }
+    }
+
+    makeNpcHappy ()
+    {
+        if (this.npcIsHappy)
+        {
+            return;
+        }
+
+        this.npcIsHappy = true;
+
+        this.npcSadTweens.forEach((tween) => tween.stop());
+        this.npcSadTweens = [];
+
+        this.npcTears.forEach((tear) => tear.setVisible(false));
+
+        this.npc.setTexture('npc-happy');
+
+        this.tweens.add({
+            targets: this.npc,
+            angle: 0,
+            scaleY: 1,
+            duration: 320,
+            ease: 'Back.easeOut'
+        });
+
+        this.tweens.add({
+            targets: this.npc,
+            scaleX: { from: 1, to: 1.08 },
+            scaleY: { from: 1, to: 1.08 },
+            yoyo: true,
+            repeat: 1,
+            duration: 180,
+            ease: 'Sine.easeOut'
+        });
+
+        const joyAura = this.add.circle(this.npc.x, this.npc.y - 18, 34, 0xfff2a6, 0.38)
+            .setBlendMode(BlendModes.ADD)
+            .setDepth(this.npc.y + 3);
+
+        this.tweens.add({
+            targets: joyAura,
+            alpha: { from: 0.38, to: 0 },
+            scale: { from: 0.75, to: 1.35 },
+            duration: 650,
+            ease: 'Sine.easeOut',
+            onComplete: () => joyAura.destroy()
+        });
     }
 
     createLamp (x: number, y: number)
@@ -387,6 +552,11 @@ export class Game extends Scene
         }
 
         this.player.setDepth(this.player.y);
+        if (this.npc)
+        {
+            this.npc.setDepth(this.npc.y);
+        }
+        this.checkNpcProximity();
         this.revealLampIfDiscovered();
         this.checkLampProximity();
     }

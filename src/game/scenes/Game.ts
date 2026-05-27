@@ -48,6 +48,15 @@ export class Game extends Scene
     playerHopeGlow: Phaser.GameObjects.Arc;
     ambientFogPatches: Phaser.GameObjects.Ellipse[];
     ambientMotionStarted: boolean;
+    grassTiles: Phaser.GameObjects.Image[];
+    worldFullyRevived: boolean;
+    worldReviveTintOverlay: Phaser.GameObjects.Rectangle;
+    playerInputLocked: boolean;
+    finalSequenceStarted: boolean;
+    finalSequenceCompleted: boolean;
+    finalMessageText: Phaser.GameObjects.Text;
+    worldLifeMotes: Phaser.GameObjects.Arc[];
+    stressNpcCalmWalkTween: Phaser.Tweens.Tween | null;
     npcComfortShadowZone: Phaser.GameObjects.Ellipse;
     npcComfortShadowRing: Phaser.GameObjects.Ellipse;
     npcComfortShadowCleared: boolean;
@@ -86,6 +95,13 @@ export class Game extends Scene
         this.worldRestoreLevel = 0;
         this.ambientFogPatches = [];
         this.ambientMotionStarted = false;
+        this.grassTiles = [];
+        this.worldFullyRevived = false;
+        this.playerInputLocked = false;
+        this.finalSequenceStarted = false;
+        this.finalSequenceCompleted = false;
+        this.worldLifeMotes = [];
+        this.stressNpcCalmWalkTween = null;
         this.npcComfortShadowCleared = false;
     }
 
@@ -901,6 +917,11 @@ export class Game extends Scene
             this.spawnDuckWaterLife();
             this.startDuckFamilyIdleGroup();
             this.onWorldInteractionCompleted('duck-family');
+
+            this.time.delayedCall(500, () =>
+            {
+                this.startFinalHarmonySequence();
+            });
         });
     }
 
@@ -942,6 +963,249 @@ export class Game extends Scene
             yoyo: true,
             repeat: -1,
             ease: 'Sine.easeInOut'
+        });
+    }
+
+    startFinalHarmonySequence ()
+    {
+        if (this.finalSequenceStarted)
+        {
+            return;
+        }
+
+        this.finalSequenceStarted = true;
+
+        // 1) Soft activation around ducks.
+        this.tweens.add({
+            targets: this.duckZoneGlow,
+            alpha: 0.32,
+            scaleX: 1.16,
+            scaleY: 1.16,
+            duration: 700,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: this.worldDarkOverlay,
+            alpha: Math.max(this.worldDarkOverlay.alpha - 0.04, 0.03),
+            duration: 700,
+            ease: 'Sine.easeOut'
+        });
+
+        this.time.delayedCall(700, () =>
+        {
+            // 2) World trigger: ensure all zones are in positive state.
+            if (!this.npcIsHappy)
+            {
+                this.makeNpcHappy();
+            }
+
+            if (!this.stressNpcResolved)
+            {
+                this.resolveStressNpc();
+            }
+
+            if (!this.lampActivated)
+            {
+                this.lampVisible = true;
+                this.lamp.setVisible(true);
+                this.activateLamp();
+            }
+
+            // Saturation / light increase to full progression.
+            this.worldRestoreLevel = 4;
+            this.applyWorldProgressVisuals(true);
+
+            this.time.delayedCall(400, () =>
+            {
+                this.startStressNpcCalmWalk();
+            });
+        });
+
+        this.time.delayedCall(1500, () =>
+        {
+            // 3) Global life propagation.
+            this.spawnGlobalLifeMotes();
+        });
+
+        this.time.delayedCall(1700, () =>
+        {
+            // 4) Gentle positive sound bed.
+            this.playFinalAmbientHarmony();
+        });
+
+        this.time.delayedCall(2100, () =>
+        {
+            // 6) Brief visual pause for observation.
+            this.pausePlayerForMoment(1500);
+        });
+
+        this.time.delayedCall(2500, () =>
+        {
+            // 7) Final center message.
+            this.showFinalImpactMessage();
+        });
+
+        this.time.delayedCall(4200, () =>
+        {
+            this.finalSequenceCompleted = true;
+        });
+    }
+
+    startStressNpcCalmWalk ()
+    {
+        if (!this.stressNpc || this.stressNpcCalmWalkTween)
+        {
+            return;
+        }
+
+        this.stressNpcCalmWalkTween = this.tweens.add({
+            targets: this.stressNpc,
+            x: { from: this.stressNpc.x - 22, to: this.stressNpc.x + 22 },
+            duration: 2600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        this.tweens.add({
+            targets: this.stressNpc,
+            y: '-=2',
+            duration: 900,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+    }
+
+    spawnGlobalLifeMotes ()
+    {
+        if (this.worldLifeMotes.length > 0)
+        {
+            return;
+        }
+
+        for (let i = 0; i < 24; i++)
+        {
+            const x = PhaserMath.Between(120, this.worldWidth - 120);
+            const y = PhaserMath.Between(120, this.worldHeight - 120);
+            const mote = this.add.circle(x, y, PhaserMath.Between(1, 2), 0xf5f9b8, 0.18)
+                .setBlendMode(BlendModes.SCREEN)
+                .setDepth(1700);
+
+            this.worldLifeMotes.push(mote);
+
+            this.tweens.add({
+                targets: mote,
+                y: y - PhaserMath.Between(24, 52),
+                x: x + PhaserMath.Between(-16, 16),
+                alpha: { from: 0.08, to: 0.34 },
+                duration: 3000 + PhaserMath.Between(0, 1800),
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
+    }
+
+    playFinalAmbientHarmony ()
+    {
+        const anySound = this.sound as unknown as { context?: AudioContext };
+        const audioContext = anySound?.context;
+
+        if (!audioContext)
+        {
+            return;
+        }
+
+        const now = audioContext.currentTime;
+        const master = audioContext.createGain();
+        master.gain.value = 0.0001;
+        master.connect(audioContext.destination);
+
+        const freqs = [220, 277.18, 329.63];
+        freqs.forEach((freq) =>
+        {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.value = 0.0001;
+            osc.connect(gain);
+            gain.connect(master);
+
+            osc.start(now);
+            gain.gain.exponentialRampToValueAtTime(0.012, now + 1.2);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 6.5);
+            osc.stop(now + 6.6);
+        });
+
+        master.gain.exponentialRampToValueAtTime(0.12, now + 1.4);
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 6.8);
+    }
+
+    pausePlayerForMoment (duration: number)
+    {
+        this.playerInputLocked = true;
+        const body = this.player.body as Phaser.Physics.Arcade.Body;
+        body.setVelocity(0);
+
+        if (this.playerInputLocked)
+        {
+            this.player.setDepth(this.player.y);
+            if (this.playerHopeGlow)
+            {
+                this.playerHopeGlow.setPosition(this.player.x, this.player.y);
+            }
+            this.updateNpcComfortShadowProgress();
+
+            if (this.npc)
+            {
+                this.npc.setDepth(this.npc.y);
+            }
+            if (this.stressNpc)
+            {
+                this.stressNpc.setDepth(this.stressNpc.y + 4);
+            }
+            if (this.duckMom)
+            {
+                this.duckMom.setDepth(this.duckMom.y + 10);
+            }
+            this.ducklings.forEach((duckling) => duckling.setDepth(duckling.y + 10));
+            return;
+        }
+
+        this.time.delayedCall(duration, () =>
+        {
+            this.playerInputLocked = false;
+        });
+    }
+
+    showFinalImpactMessage ()
+    {
+        if (this.finalMessageText)
+        {
+            return;
+        }
+
+        this.finalMessageText = this.add.text(512, 380, 'Small actions. Big impact.', {
+            fontFamily: 'Arial Black',
+            fontSize: 52,
+            color: '#f6ffe5',
+            stroke: '#20331b',
+            strokeThickness: 7,
+            align: 'center'
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(5000)
+            .setAlpha(0);
+
+        this.tweens.add({
+            targets: this.finalMessageText,
+            alpha: 1,
+            duration: 900,
+            ease: 'Sine.easeOut'
         });
     }
 
@@ -1172,6 +1436,51 @@ export class Game extends Scene
 
             this.startAmbientDecorMotion();
         }
+
+        if (this.worldRestoreLevel >= 4)
+        {
+            this.activateFullMapRevival();
+        }
+    }
+
+    activateFullMapRevival ()
+    {
+        if (this.worldFullyRevived)
+        {
+            return;
+        }
+
+        this.worldFullyRevived = true;
+
+        this.grassTiles.forEach((tile, index) =>
+        {
+            this.time.delayedCall((index % 18) * 14, () =>
+            {
+                tile.setTint(0x6fb264);
+            });
+        });
+
+        this.worldReviveTintOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x8ed06d, 0)
+            .setBlendMode(BlendModes.SCREEN)
+            .setDepth(1492);
+
+        this.tweens.add({
+            targets: this.worldReviveTintOverlay,
+            alpha: 0.16,
+            duration: 1100,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: this.worldReviveTintOverlay,
+            alpha: { from: 0.16, to: 0.1 },
+            duration: 2200,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        this.cameras.main.flash(260, 190, 255, 170, false);
     }
 
     startAmbientDecorMotion ()
@@ -1402,7 +1711,8 @@ export class Game extends Scene
         {
             for (let x = 32; x < this.worldWidth; x += 64)
             {
-                this.add.image(x, y, 'grass-tile').setDepth(-1000);
+                const grass = this.add.image(x, y, 'grass-tile').setDepth(-1000);
+                this.grassTiles.push(grass);
             }
         }
 

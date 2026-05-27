@@ -49,12 +49,14 @@ export class Game extends Scene
     ambientFogPatches: Phaser.GameObjects.Ellipse[];
     ambientMotionStarted: boolean;
     grassTiles: Phaser.GameObjects.Image[];
+    occupiedGrassTileKeys: Set<string>;
     worldFullyRevived: boolean;
     worldReviveTintOverlay: Phaser.GameObjects.Rectangle;
     playerInputLocked: boolean;
     finalSequenceStarted: boolean;
     finalSequenceCompleted: boolean;
     finalMessageText: Phaser.GameObjects.Text;
+    finalMessageFadeOverlay: Phaser.GameObjects.Rectangle;
     worldLifeMotes: Phaser.GameObjects.Arc[];
     stressNpcCalmWalkTween: Phaser.Tweens.Tween | null;
     npcComfortShadowZone: Phaser.GameObjects.Ellipse;
@@ -96,6 +98,7 @@ export class Game extends Scene
         this.ambientFogPatches = [];
         this.ambientMotionStarted = false;
         this.grassTiles = [];
+        this.occupiedGrassTileKeys = new Set<string>();
         this.worldFullyRevived = false;
         this.playerInputLocked = false;
         this.finalSequenceStarted = false;
@@ -918,6 +921,9 @@ export class Game extends Scene
             this.startDuckFamilyIdleGroup();
             this.onWorldInteractionCompleted('duck-family');
 
+            // Immediate global map color change after duck reunion.
+            this.activateFullMapRevival();
+
             this.time.delayedCall(500, () =>
             {
                 this.startFinalHarmonySequence();
@@ -974,6 +980,9 @@ export class Game extends Scene
         }
 
         this.finalSequenceStarted = true;
+
+        // Right after duck sequence: trigger the global map transformation.
+        this.activateFullMapRevival();
 
         // 1) Soft activation around ducks.
         this.tweens.add({
@@ -1188,6 +1197,26 @@ export class Game extends Scene
             return;
         }
 
+        this.finalMessageFadeOverlay = this.add.rectangle(512, 384, 1024, 768, 0xf4f6df, 0)
+            .setScrollFactor(0)
+            .setDepth(4990);
+
+        this.tweens.add({
+            targets: this.finalMessageFadeOverlay,
+            alpha: 0.18,
+            duration: 640,
+            ease: 'Sine.easeInOut',
+            onComplete: () =>
+            {
+                this.tweens.add({
+                    targets: this.finalMessageFadeOverlay,
+                    alpha: 0.08,
+                    duration: 480,
+                    ease: 'Sine.easeOut'
+                });
+            }
+        });
+
         this.finalMessageText = this.add.text(512, 380, 'Small actions. Big impact.', {
             fontFamily: 'Arial Black',
             fontSize: 52,
@@ -1205,6 +1234,7 @@ export class Game extends Scene
             targets: this.finalMessageText,
             alpha: 1,
             duration: 900,
+            delay: 320,
             ease: 'Sine.easeOut'
         });
     }
@@ -1439,7 +1469,7 @@ export class Game extends Scene
 
         if (this.worldRestoreLevel >= 4)
         {
-            this.activateFullMapRevival();
+            // Final full-map revival is triggered in the final message sequence.
         }
     }
 
@@ -1452,35 +1482,53 @@ export class Game extends Scene
 
         this.worldFullyRevived = true;
 
-        this.grassTiles.forEach((tile, index) =>
+        // Global simultaneous tint for the full map while the overlays fade in smoothly.
+        this.grassTiles.forEach((tile) =>
         {
-            this.time.delayedCall((index % 18) * 14, () =>
-            {
-                tile.setTint(0x6fb264);
-            });
+            tile.setTint(0x7be85f);
         });
 
-        this.worldReviveTintOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x8ed06d, 0)
-            .setBlendMode(BlendModes.SCREEN)
-            .setDepth(1492);
-
         this.tweens.add({
-            targets: this.worldReviveTintOverlay,
-            alpha: 0.16,
-            duration: 1100,
+            targets: [this.worldDarkOverlay, this.worldColdOverlay],
+            alpha: 0.01,
+            duration: 1600,
             ease: 'Sine.easeOut'
         });
 
         this.tweens.add({
-            targets: this.worldReviveTintOverlay,
-            alpha: { from: 0.16, to: 0.1 },
-            duration: 2200,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
+            targets: this.worldWarmOverlay,
+            alpha: 0.3,
+            duration: 1600,
+            ease: 'Sine.easeOut'
         });
 
-        this.cameras.main.flash(260, 190, 255, 170, false);
+        this.worldReviveTintOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x79f05e, 0)
+            .setBlendMode(BlendModes.NORMAL)
+            .setDepth(1492);
+
+        this.tweens.add({
+            targets: this.worldReviveTintOverlay,
+            alpha: 0.2,
+            duration: 1600,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.addCounter({
+            from: 0,
+            to: 100,
+            duration: 1600,
+            ease: 'Sine.easeOut',
+            onUpdate: (tween) =>
+            {
+                const t = tween.getValue() / 100;
+                const r = Math.round(PhaserMath.Linear(0x1c, 0x67, t));
+                const g = Math.round(PhaserMath.Linear(0x26, 0xbf, t));
+                const b = Math.round(PhaserMath.Linear(0x2e, 0x58, t));
+                const color = (r << 16) | (g << 8) | b;
+                this.cameras.main.setBackgroundColor(color);
+            }
+        });
+
     }
 
     startAmbientDecorMotion ()
@@ -1746,7 +1794,33 @@ export class Game extends Scene
         obstacle.setDepth(y);
         obstacle.refreshBody();
         this.obstacles.add(obstacle);
+        this.markGrassTilesOccupiedByObstacle(obstacle);
         return obstacle;
+    }
+
+    markGrassTilesOccupiedByObstacle (obstacle: Phaser.Physics.Arcade.Image)
+    {
+        const bounds = obstacle.getBounds();
+        const startCol = Math.floor((bounds.left - 32) / 64);
+        const endCol = Math.ceil((bounds.right - 32) / 64);
+        const startRow = Math.floor((bounds.top - 32) / 64);
+        const endRow = Math.ceil((bounds.bottom - 32) / 64);
+
+        for (let col = startCol; col <= endCol; col++)
+        {
+            for (let row = startRow; row <= endRow; row++)
+            {
+                const tileX = 32 + (col * 64);
+                const tileY = 32 + (row * 64);
+
+                if (tileX < 32 || tileX > this.worldWidth || tileY < 32 || tileY > this.worldHeight)
+                {
+                    continue;
+                }
+
+                this.occupiedGrassTileKeys.add(`${tileX}:${tileY}`);
+            }
+        }
     }
 
     buildVillage ()

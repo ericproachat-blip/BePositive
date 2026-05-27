@@ -18,6 +18,15 @@ export class Game extends Scene
     npcSadTweens: Phaser.Tweens.Tween[];
     npcIsHappy: boolean;
     npcTriggerDistance: number;
+    stressNpc: Phaser.GameObjects.Sprite;
+    stressNpcMarks: Phaser.GameObjects.Arc[];
+    stressNpcTweens: Phaser.Tweens.Tween[];
+    stressClutter: Phaser.GameObjects.Image[];
+    stressZoneShade: Phaser.GameObjects.Ellipse;
+    stressZoneGlow: Phaser.GameObjects.Ellipse;
+    stressNpcResolved: boolean;
+    stressNpcInteractionStarted: boolean;
+    stressNpcTriggerDistance: number;
     moveSpeed: number;
     worldWidth: number;
     worldHeight: number;
@@ -37,6 +46,12 @@ export class Game extends Scene
         this.npcSadTweens = [];
         this.npcIsHappy = false;
         this.npcTriggerDistance = 84;
+        this.stressNpcMarks = [];
+        this.stressNpcTweens = [];
+        this.stressClutter = [];
+        this.stressNpcResolved = false;
+        this.stressNpcInteractionStarted = false;
+        this.stressNpcTriggerDistance = 108;
     }
 
     create ()
@@ -67,6 +82,7 @@ export class Game extends Scene
         this.player.setDepth(this.player.y);
 
         this.createNpc(1540, 980);
+        this.createStressNpcZone(1980, 1180);
 
         this.physics.add.collider(this.player, this.obstacles);
 
@@ -265,6 +281,93 @@ export class Game extends Scene
             npcHappy.generateTexture('npc-happy', 48, 56);
             npcHappy.destroy();
         }
+
+        if (!this.textures.exists('npc-stress'))
+        {
+            const npcStress = this.add.graphics();
+            npcStress.fillStyle(0x2b2b2b, 0.18);
+            npcStress.fillEllipse(26, 54, 30, 8);
+
+            npcStress.fillStyle(0xf2c7a2, 1);
+            npcStress.fillCircle(24, 20, 9);
+
+            npcStress.fillStyle(0x746a5f, 1);
+            npcStress.fillEllipse(24, 34, 28, 16);
+            npcStress.fillRect(9, 34, 30, 8);
+            npcStress.fillStyle(0x60584f, 1);
+            npcStress.fillRect(12, 42, 9, 8);
+            npcStress.fillRect(27, 42, 9, 8);
+
+            npcStress.fillStyle(0x1f1f1f, 1);
+            npcStress.fillRect(18, 18, 2, 2);
+            npcStress.fillRect(28, 18, 2, 2);
+            npcStress.fillRect(18, 24, 12, 2);
+
+            npcStress.generateTexture('npc-stress', 56, 60);
+            npcStress.destroy();
+        }
+
+        if (!this.textures.exists('npc-calm'))
+        {
+            const npcCalm = this.add.graphics();
+            npcCalm.fillStyle(0x2b2b2b, 0.2);
+            npcCalm.fillEllipse(24, 52, 24, 8);
+
+            npcCalm.fillStyle(0xf2c7a2, 1);
+            npcCalm.fillCircle(24, 14, 10);
+
+            npcCalm.fillStyle(0xa98b55, 1);
+            npcCalm.fillRect(13, 24, 22, 16);
+            npcCalm.fillStyle(0x7f6b40, 1);
+            npcCalm.fillRect(14, 40, 9, 9);
+            npcCalm.fillRect(25, 40, 9, 9);
+
+            npcCalm.fillStyle(0x1e1e1e, 1);
+            npcCalm.fillRect(19, 14, 2, 2);
+            npcCalm.fillRect(27, 14, 2, 2);
+            npcCalm.fillRect(20, 21, 8, 2);
+            npcCalm.fillRect(18, 20, 2, 2);
+            npcCalm.fillRect(28, 20, 2, 2);
+
+            npcCalm.generateTexture('npc-calm', 48, 56);
+            npcCalm.destroy();
+        }
+
+        if (!this.textures.exists('clutter-paper'))
+        {
+            const paper = this.add.graphics();
+            paper.fillStyle(0x9a9da0, 1);
+            paper.fillRect(4, 4, 18, 14);
+            paper.lineStyle(1, 0x72767a, 1);
+            paper.strokeRect(4, 4, 18, 14);
+            paper.generateTexture('clutter-paper', 28, 24);
+            paper.destroy();
+        }
+
+        if (!this.textures.exists('clutter-box'))
+        {
+            const box = this.add.graphics();
+            box.fillStyle(0x68584f, 1);
+            box.fillRect(4, 6, 20, 14);
+            box.lineStyle(2, 0x4e423b, 1);
+            box.strokeRect(4, 6, 20, 14);
+            box.lineBetween(14, 6, 14, 20);
+            box.generateTexture('clutter-box', 28, 28);
+            box.destroy();
+        }
+
+        if (!this.textures.exists('clutter-bag'))
+        {
+            const bag = this.add.graphics();
+            bag.fillStyle(0x58606b, 1);
+            bag.fillRoundedRect(4, 8, 18, 14, 4);
+            bag.lineStyle(2, 0x404750, 1);
+            bag.strokeRoundedRect(4, 8, 18, 14, 4);
+            bag.lineBetween(9, 8, 9, 4);
+            bag.lineBetween(19, 8, 19, 4);
+            bag.generateTexture('clutter-bag', 28, 28);
+            bag.destroy();
+        }
     }
 
     createNpc (x: number, y: number)
@@ -368,6 +471,199 @@ export class Game extends Scene
             duration: 650,
             ease: 'Sine.easeOut',
             onComplete: () => joyAura.destroy()
+        });
+    }
+
+    createStressNpcZone (x: number, y: number)
+    {
+        this.stressZoneShade = this.add.ellipse(x, y + 8, 340, 230, 0x50575f, 0.2)
+            .setDepth(y - 40);
+        this.stressZoneGlow = this.add.ellipse(x, y + 4, 320, 210, 0xf4ecb2, 0)
+            .setBlendMode(BlendModes.ADD)
+            .setDepth(y - 39);
+
+        this.stressNpc = this.add.sprite(x, y, 'npc-stress').setDepth(y + 4);
+        this.stressNpc.setAngle(-18);
+        this.stressNpc.setScale(1, 0.92);
+
+        const markA = this.add.circle(x - 18, y - 34, 3, 0xaeb9c4, 0.8).setDepth(y + 8);
+        const markB = this.add.circle(x + 2, y - 44, 3, 0xaeb9c4, 0.74).setDepth(y + 8);
+        const markC = this.add.circle(x + 20, y - 36, 3, 0xaeb9c4, 0.8).setDepth(y + 8);
+        this.stressNpcMarks = [markA, markB, markC];
+
+        this.stressClutter = [
+            this.addStressClutter(x - 54, y + 30, 'clutter-paper', -32, x - 86, y - 30, 1),
+            this.addStressClutter(x - 20, y + 46, 'clutter-box', 24, x - 42, y - 30, 0.95),
+            this.addStressClutter(x + 30, y + 34, 'clutter-bag', -20, x + 6, y - 30, 1),
+            this.addStressClutter(x + 62, y + 10, 'clutter-paper', 18, x + 54, y - 30, 1),
+            this.addStressClutter(x - 66, y - 4, 'clutter-box', -14, x + 90, y - 30, 0.92),
+            this.addStressClutter(x + 70, y + 46, 'clutter-bag', 30, x + 126, y - 30, 0.95)
+        ];
+
+        this.stressNpcTweens.push(this.tweens.add({
+            targets: this.stressNpc,
+            angle: { from: -22, to: -11 },
+            x: { from: x - 4, to: x + 4 },
+            duration: 160,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        }));
+
+        this.stressNpcTweens.push(this.tweens.add({
+            targets: this.stressNpc,
+            y: { from: y - 2, to: y + 2 },
+            duration: 110,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Linear'
+        }));
+
+        this.stressNpcMarks.forEach((mark, index) =>
+        {
+            const baseY = mark.y;
+            const baseX = mark.x;
+
+            this.stressNpcTweens.push(this.tweens.add({
+                targets: mark,
+                y: baseY - 10,
+                x: baseX + (index - 1) * 5,
+                alpha: { from: 0.82, to: 0.18 },
+                duration: 260 + (index * 40),
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeOut'
+            }));
+        });
+    }
+
+    addStressClutter (x: number, y: number, texture: string, angle: number, tidyX: number, tidyY: number, scale = 1)
+    {
+        const clutter = this.add.image(x, y, texture).setDepth(y + 2);
+        clutter.setAngle(angle);
+        clutter.setScale(scale);
+        clutter.setAlpha(0.88);
+        clutter.setData('tidyX', tidyX);
+        clutter.setData('tidyY', tidyY);
+        clutter.setData('tidyAngle', 0);
+        clutter.setData('tidyScale', scale);
+        return clutter;
+    }
+
+    checkStressNpcProximity ()
+    {
+        if (this.stressNpcResolved || this.stressNpcInteractionStarted || !this.stressNpc)
+        {
+            return;
+        }
+
+        const distance = PhaserMath.Distance.Between(this.player.x, this.player.y, this.stressNpc.x, this.stressNpc.y);
+
+        if (distance <= this.stressNpcTriggerDistance)
+        {
+            this.resolveStressNpc();
+        }
+    }
+
+    resolveStressNpc ()
+    {
+        if (this.stressNpcInteractionStarted)
+        {
+            return;
+        }
+
+        this.stressNpcInteractionStarted = true;
+
+        this.stressNpcTweens.forEach((tween) => tween.timeScale = 0.25);
+
+        this.tweens.add({
+            targets: this.stressNpc,
+            angle: -8,
+            scaleY: 0.95,
+            duration: 450,
+            ease: 'Sine.easeOut'
+        });
+
+        this.time.delayedCall(260, () =>
+        {
+            this.stressNpcMarks.forEach((mark) =>
+            {
+                this.tweens.add({
+                    targets: mark,
+                    alpha: 0,
+                    scale: 0.6,
+                    duration: 280,
+                    ease: 'Sine.easeInOut',
+                    onComplete: () => mark.setVisible(false)
+                });
+            });
+
+            this.organizeStressClutter();
+        });
+
+        this.time.delayedCall(950, () =>
+        {
+            this.stressNpcTweens.forEach((tween) => tween.stop());
+            this.stressNpcTweens = [];
+
+            this.stressNpc.setTexture('npc-calm');
+
+            this.tweens.add({
+                targets: this.stressNpc,
+                angle: 0,
+                x: this.stressNpc.x,
+                y: this.stressNpc.y - 28,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 520,
+                ease: 'Back.easeOut'
+            });
+
+            this.tweens.add({
+                targets: this.stressZoneShade,
+                alpha: 0.03,
+                duration: 900,
+                ease: 'Sine.easeOut'
+            });
+
+            this.tweens.add({
+                targets: this.stressZoneGlow,
+                alpha: 0.22,
+                scaleX: 1.08,
+                scaleY: 1.06,
+                duration: 900,
+                ease: 'Sine.easeOut'
+            });
+        });
+
+        this.time.delayedCall(1480, () =>
+        {
+            this.stressNpcResolved = true;
+
+            this.tweens.add({
+                targets: this.stressNpc,
+                y: { from: this.stressNpc.y, to: this.stressNpc.y - 3 },
+                duration: 850,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        });
+    }
+
+    organizeStressClutter ()
+    {
+        this.stressClutter.forEach((item, index) =>
+        {
+            this.tweens.add({
+                targets: item,
+                x: item.getData('tidyX') as number,
+                y: item.getData('tidyY') as number,
+                angle: item.getData('tidyAngle') as number,
+                alpha: 0.98,
+                duration: 650 + (index * 60),
+                ease: 'Sine.easeInOut'
+            });
         });
     }
 
@@ -596,6 +892,11 @@ export class Game extends Scene
         {
             this.npc.setDepth(this.npc.y);
         }
+        if (this.stressNpc)
+        {
+            this.stressNpc.setDepth(this.stressNpc.y + 4);
+        }
+        this.checkStressNpcProximity();
         this.checkNpcProximity();
         this.revealLampIfDiscovered();
         this.checkLampProximity();

@@ -27,6 +27,15 @@ export class Game extends Scene
     stressNpcResolved: boolean;
     stressNpcInteractionStarted: boolean;
     stressNpcTriggerDistance: number;
+    duckMom: Phaser.GameObjects.Sprite;
+    ducklings: Phaser.GameObjects.Sprite[];
+    duckPlank: Phaser.GameObjects.Image;
+    duckZoneShade: Phaser.GameObjects.Ellipse;
+    duckZoneGlow: Phaser.GameObjects.Ellipse;
+    duckWaterHighlights: Phaser.GameObjects.Ellipse[];
+    duckFamilyReunited: boolean;
+    duckInteractionStarted: boolean;
+    duckPlankTriggerDistance: number;
     moveSpeed: number;
     worldWidth: number;
     worldHeight: number;
@@ -52,6 +61,11 @@ export class Game extends Scene
         this.stressNpcResolved = false;
         this.stressNpcInteractionStarted = false;
         this.stressNpcTriggerDistance = 108;
+        this.ducklings = [];
+        this.duckWaterHighlights = [];
+        this.duckFamilyReunited = false;
+        this.duckInteractionStarted = false;
+        this.duckPlankTriggerDistance = 112;
     }
 
     create ()
@@ -68,6 +82,7 @@ export class Game extends Scene
 
         this.obstacles = this.physics.add.staticGroup();
         this.buildVillage();
+        this.createDuckFamilyZone();
 
         this.createLamp(1280, 220);
 
@@ -134,6 +149,22 @@ export class Game extends Scene
             path.fillRect(24, 46, 8, 8);
             path.generateTexture('path-tile', 64, 64);
             path.destroy();
+        }
+
+        if (!this.textures.exists('water-tile'))
+        {
+            const water = this.add.graphics();
+            water.fillStyle(0x4b5f70, 1);
+            water.fillRect(0, 0, 64, 64);
+            water.fillStyle(0x607989, 1);
+            water.fillRect(0, 8, 64, 10);
+            water.fillRect(0, 28, 64, 8);
+            water.fillRect(0, 46, 64, 10);
+            water.fillStyle(0x364958, 0.65);
+            water.fillRect(12, 0, 6, 64);
+            water.fillRect(40, 0, 5, 64);
+            water.generateTexture('water-tile', 64, 64);
+            water.destroy();
         }
 
         if (!this.textures.exists('wall-block'))
@@ -331,6 +362,69 @@ export class Game extends Scene
 
             npcCalm.generateTexture('npc-calm', 48, 56);
             npcCalm.destroy();
+        }
+
+        if (!this.textures.exists('duck-mom'))
+        {
+            const duckMom = this.add.graphics();
+            duckMom.fillStyle(0x2f2f2f, 0.2);
+            duckMom.fillEllipse(22, 30, 30, 8);
+            duckMom.fillStyle(0xe4d08a, 1);
+            duckMom.fillEllipse(18, 20, 24, 16);
+            duckMom.fillCircle(31, 15, 8);
+            duckMom.fillStyle(0xd09f53, 1);
+            duckMom.fillTriangle(37, 14, 47, 17, 37, 20);
+            duckMom.fillStyle(0x232323, 1);
+            duckMom.fillCircle(33, 14, 1.6);
+            duckMom.generateTexture('duck-mom', 56, 40);
+            duckMom.destroy();
+        }
+
+        if (!this.textures.exists('duckling'))
+        {
+            const duckling = this.add.graphics();
+            duckling.fillStyle(0x2f2f2f, 0.2);
+            duckling.fillEllipse(14, 20, 18, 6);
+            duckling.fillStyle(0xe7d689, 1);
+            duckling.fillEllipse(12, 13, 14, 10);
+            duckling.fillCircle(20, 10, 5);
+            duckling.fillStyle(0xd09f53, 1);
+            duckling.fillTriangle(24, 9, 30, 11, 24, 13);
+            duckling.fillStyle(0x232323, 1);
+            duckling.fillCircle(21, 9, 1.2);
+            duckling.generateTexture('duckling', 34, 28);
+            duckling.destroy();
+        }
+
+        if (!this.textures.exists('wood-plank'))
+        {
+            const plank = this.add.graphics();
+            plank.fillStyle(0x6d5441, 1);
+            plank.fillRoundedRect(2, 2, 92, 22, 4);
+            plank.lineStyle(2, 0x4f3e31, 1);
+            plank.strokeRoundedRect(2, 2, 92, 22, 4);
+            plank.lineBetween(20, 2, 20, 24);
+            plank.lineBetween(42, 2, 42, 24);
+            plank.lineBetween(64, 2, 64, 24);
+            plank.generateTexture('wood-plank', 96, 26);
+            plank.destroy();
+        }
+
+        if (!this.textures.exists('wood-plank-bridge'))
+        {
+            const bridge = this.add.graphics();
+            bridge.fillStyle(0x6d5441, 1);
+            bridge.fillRoundedRect(2, 2, 192, 22, 4);
+            bridge.lineStyle(2, 0x4f3e31, 1);
+            bridge.strokeRoundedRect(2, 2, 192, 22, 4);
+
+            for (let x = 18; x <= 178; x += 20)
+            {
+                bridge.lineBetween(x, 2, x, 24);
+            }
+
+            bridge.generateTexture('wood-plank-bridge', 196, 26);
+            bridge.destroy();
         }
 
         if (!this.textures.exists('clutter-paper'))
@@ -548,6 +642,240 @@ export class Game extends Scene
         clutter.setData('tidyAngle', 0);
         clutter.setData('tidyScale', scale);
         return clutter;
+    }
+
+    createDuckFamilyZone ()
+    {
+        const zoneY = 930;
+
+        this.duckZoneShade = this.add.ellipse(235, zoneY, 430, 280, 0x5a6169, 0.2)
+            .setDepth(860);
+        this.duckZoneGlow = this.add.ellipse(236, zoneY, 420, 270, 0xf9ec9a, 0)
+            .setBlendMode(BlendModes.ADD)
+            .setDepth(861);
+
+        this.duckMom = this.add.sprite(372, zoneY - 12, 'duck-mom')
+            .setDepth(zoneY + 10)
+            .setFlipX(true);
+
+        this.duckPlank = this.add.image(414, zoneY + 22, 'wood-plank-bridge')
+            .setDepth(zoneY + 12)
+            .setAngle(-8)
+            .setAlpha(0.92);
+
+        const ducklingPositions = [
+            { x: 88, y: zoneY - 24 },
+            { x: 118, y: zoneY - 6 },
+            { x: 104, y: zoneY + 18 },
+            { x: 136, y: zoneY + 34 }
+        ];
+
+        this.ducklings = ducklingPositions.map((pos) =>
+        {
+            return this.add.sprite(pos.x, pos.y, 'duckling')
+                .setDepth(pos.y + 10)
+                .setFlipX(false);
+        });
+
+        this.tweens.add({
+            targets: this.duckMom,
+            y: this.duckMom.y - 3,
+            duration: 1100,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        this.ducklings.forEach((duckling, index) =>
+        {
+            this.tweens.add({
+                targets: duckling,
+                y: duckling.y - 2,
+                duration: 960 + (index * 120),
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        });
+    }
+
+    checkDuckPlankProximity ()
+    {
+        if (this.duckFamilyReunited || this.duckInteractionStarted || !this.duckPlank)
+        {
+            return;
+        }
+
+        const distance = PhaserMath.Distance.Between(this.player.x, this.player.y, this.duckPlank.x, this.duckPlank.y);
+
+        if (distance <= this.duckPlankTriggerDistance)
+        {
+            this.startDuckFamilySequence();
+        }
+    }
+
+    startDuckFamilySequence ()
+    {
+        if (this.duckInteractionStarted)
+        {
+            return;
+        }
+
+        this.duckInteractionStarted = true;
+
+        this.tweens.add({
+            targets: this.duckPlank,
+            x: 224,
+            y: 952,
+            angle: 0,
+            duration: 900,
+            ease: 'Sine.easeInOut',
+            onComplete: () =>
+            {
+                // As soon as the bridge is in place, the area starts recovering.
+                this.tweens.add({
+                    targets: this.duckZoneShade,
+                    alpha: 0.06,
+                    duration: 520,
+                    ease: 'Sine.easeOut'
+                });
+
+                this.tweens.add({
+                    targets: this.duckZoneGlow,
+                    alpha: 0.2,
+                    scaleX: 1.08,
+                    scaleY: 1.08,
+                    duration: 520,
+                    ease: 'Sine.easeOut'
+                });
+            }
+        });
+
+        this.time.delayedCall(980, () =>
+        {
+            this.ducklings.forEach((duckling, index) =>
+            {
+                this.tweens.add({
+                    targets: duckling,
+                    x: duckling.x + 4,
+                    y: duckling.y - 4,
+                    duration: 120,
+                    yoyo: true,
+                    repeat: 1,
+                    delay: index * 70,
+                    ease: 'Sine.easeInOut'
+                });
+            });
+        });
+
+        const targetSpots = [
+            { x: 322, y: 906 },
+            { x: 344, y: 932 },
+            { x: 302, y: 944 },
+            { x: 334, y: 966 }
+        ];
+
+        this.time.delayedCall(1350, () =>
+        {
+            this.ducklings.forEach((duckling, index) =>
+            {
+                this.tweens.add({
+                    targets: duckling,
+                    x: 224,
+                    y: 946,
+                    duration: 700,
+                    delay: index * 240,
+                    ease: 'Sine.easeInOut',
+                    onStart: () => duckling.setFlipX(false),
+                    onComplete: () =>
+                    {
+                        this.tweens.add({
+                            targets: duckling,
+                            x: targetSpots[index].x,
+                            y: targetSpots[index].y,
+                            duration: 520,
+                            ease: 'Sine.easeOut',
+                            onStart: () => duckling.setFlipX(false)
+                        });
+                    }
+                });
+            });
+        });
+
+        this.time.delayedCall(3150, () =>
+        {
+            this.duckFamilyReunited = true;
+            this.duckMom.setFlipX(true);
+
+            this.tweens.add({
+                targets: [this.duckMom, ...this.ducklings],
+                y: '-=4',
+                duration: 180,
+                yoyo: true,
+                repeat: 2,
+                ease: 'Sine.easeOut'
+            });
+
+            this.tweens.add({
+                targets: this.duckZoneShade,
+                alpha: 0.04,
+                duration: 900,
+                ease: 'Sine.easeOut'
+            });
+
+            this.tweens.add({
+                targets: this.duckZoneGlow,
+                alpha: 0.24,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                duration: 900,
+                ease: 'Sine.easeOut'
+            });
+
+            this.spawnDuckWaterLife();
+            this.startDuckFamilyIdleGroup();
+        });
+    }
+
+    spawnDuckWaterLife ()
+    {
+        const rippleData = [
+            { x: 200, y: 900, width: 42, height: 12 },
+            { x: 238, y: 1020, width: 36, height: 10 },
+            { x: 210, y: 780, width: 30, height: 9 }
+        ];
+
+        rippleData.forEach((ripple, index) =>
+        {
+            const shape = this.add.ellipse(ripple.x, ripple.y, ripple.width, ripple.height, 0xc6e8ff, 0.28)
+                .setDepth(875 + index)
+                .setBlendMode(BlendModes.SCREEN);
+
+            this.duckWaterHighlights.push(shape);
+
+            this.tweens.add({
+                targets: shape,
+                alpha: { from: 0.32, to: 0.08 },
+                scaleX: { from: 0.8, to: 1.4 },
+                scaleY: { from: 0.8, to: 1.35 },
+                duration: 920 + (index * 120),
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        });
+    }
+
+    startDuckFamilyIdleGroup ()
+    {
+        this.tweens.add({
+            targets: [this.duckMom, ...this.ducklings],
+            y: '-=2',
+            duration: 780,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
     }
 
     checkStressNpcProximity ()
@@ -782,6 +1110,17 @@ export class Game extends Scene
             }
         }
 
+        // River strip on the left side from top to bottom.
+        for (let y = 32; y < this.worldHeight; y += 64)
+        {
+            this.add.image(160, y, 'water-tile').setDepth(-996);
+            this.add.image(224, y, 'water-tile').setDepth(-996);
+            this.add.image(288, y, 'water-tile').setDepth(-996);
+        }
+
+        this.add.rectangle(224, this.worldHeight / 2, 214, this.worldHeight, 0x56697a, 0.12)
+            .setDepth(-995);
+
         // Main path from the spawn to village center.
         for (let x = 224; x <= 1344; x += 64)
         {
@@ -896,6 +1235,12 @@ export class Game extends Scene
         {
             this.stressNpc.setDepth(this.stressNpc.y + 4);
         }
+        if (this.duckMom)
+        {
+            this.duckMom.setDepth(this.duckMom.y + 10);
+        }
+        this.ducklings.forEach((duckling) => duckling.setDepth(duckling.y + 10));
+        this.checkDuckPlankProximity();
         this.checkStressNpcProximity();
         this.checkNpcProximity();
         this.revealLampIfDiscovered();

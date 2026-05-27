@@ -9,6 +9,8 @@ export class Game extends Scene
     obstacles: Phaser.Physics.Arcade.StaticGroup;
     lamp: Phaser.GameObjects.Sprite;
     lampGlow: Phaser.GameObjects.Arc;
+    lampGlowOuter: Phaser.GameObjects.Arc;
+    lampBloomFlowers: Phaser.GameObjects.Image[];
     lampVisible: boolean;
     lampActivated: boolean;
     lampTriggerDistance: number;
@@ -36,6 +38,19 @@ export class Game extends Scene
     duckFamilyReunited: boolean;
     duckInteractionStarted: boolean;
     duckPlankTriggerDistance: number;
+    completedInteractions: Set<string>;
+    worldRestoreLevel: number;
+    worldDarkOverlay: Phaser.GameObjects.Rectangle;
+    worldColdOverlay: Phaser.GameObjects.Rectangle;
+    worldWarmOverlay: Phaser.GameObjects.Rectangle;
+    vignetteTop: Phaser.GameObjects.Rectangle;
+    vignetteBottom: Phaser.GameObjects.Rectangle;
+    playerHopeGlow: Phaser.GameObjects.Arc;
+    ambientFogPatches: Phaser.GameObjects.Ellipse[];
+    ambientMotionStarted: boolean;
+    npcComfortShadowZone: Phaser.GameObjects.Ellipse;
+    npcComfortShadowRing: Phaser.GameObjects.Ellipse;
+    npcComfortShadowCleared: boolean;
     moveSpeed: number;
     worldWidth: number;
     worldHeight: number;
@@ -49,6 +64,7 @@ export class Game extends Scene
         this.worldHeight = 1792;
         this.lampVisible = false;
         this.lampActivated = false;
+        this.lampBloomFlowers = [];
         this.lampTriggerDistance = 64;
         this.lampRevealYThreshold = 520;
         this.npcTears = [];
@@ -66,6 +82,11 @@ export class Game extends Scene
         this.duckFamilyReunited = false;
         this.duckInteractionStarted = false;
         this.duckPlankTriggerDistance = 112;
+        this.completedInteractions = new Set<string>();
+        this.worldRestoreLevel = 0;
+        this.ambientFogPatches = [];
+        this.ambientMotionStarted = false;
+        this.npcComfortShadowCleared = false;
     }
 
     create ()
@@ -261,6 +282,45 @@ export class Game extends Scene
             lampOn.fillCircle(32, 20, 6);
             lampOn.generateTexture('lamp-on', 64, 64);
             lampOn.destroy();
+        }
+
+        if (!this.textures.exists('flower-yellow'))
+        {
+            const flower = this.add.graphics();
+            flower.fillStyle(0x4f6a45, 1);
+            flower.fillRect(15, 18, 2, 10);
+            flower.fillStyle(0xf4d96b, 1);
+            flower.fillCircle(16, 14, 4);
+            flower.fillStyle(0xffefb2, 1);
+            flower.fillCircle(16, 14, 1.5);
+            flower.generateTexture('flower-yellow', 32, 32);
+            flower.destroy();
+        }
+
+        if (!this.textures.exists('flower-pink'))
+        {
+            const flower = this.add.graphics();
+            flower.fillStyle(0x4f6a45, 1);
+            flower.fillRect(15, 18, 2, 10);
+            flower.fillStyle(0xe8a3c5, 1);
+            flower.fillCircle(16, 14, 4);
+            flower.fillStyle(0xffd9e9, 1);
+            flower.fillCircle(16, 14, 1.5);
+            flower.generateTexture('flower-pink', 32, 32);
+            flower.destroy();
+        }
+
+        if (!this.textures.exists('flower-blue'))
+        {
+            const flower = this.add.graphics();
+            flower.fillStyle(0x4f6a45, 1);
+            flower.fillRect(15, 18, 2, 10);
+            flower.fillStyle(0x9bc5f6, 1);
+            flower.fillCircle(16, 14, 4);
+            flower.fillStyle(0xe6f3ff, 1);
+            flower.fillCircle(16, 14, 1.5);
+            flower.generateTexture('flower-blue', 32, 32);
+            flower.destroy();
         }
 
         if (!this.textures.exists('npc-sad'))
@@ -470,6 +530,8 @@ export class Game extends Scene
         this.npc.setAngle(12);
         this.npc.setScale(1, 0.96);
 
+        this.createNpcComfortShadow(x, y);
+
         const leftTear = this.add.circle(x - 6, y - 14, 2, 0x8cc7ff, 0.95).setDepth(y + 2);
         const rightTear = this.add.circle(x + 6, y - 14, 2, 0x8cc7ff, 0.95).setDepth(y + 2);
         this.npcTears = [leftTear, rightTear];
@@ -527,6 +589,8 @@ export class Game extends Scene
             return;
         }
 
+        this.clearNpcComfortShadowPermanent();
+
         this.npcIsHappy = true;
 
         this.npcSadTweens.forEach((tween) => tween.stop());
@@ -566,6 +630,8 @@ export class Game extends Scene
             ease: 'Sine.easeOut',
             onComplete: () => joyAura.destroy()
         });
+
+        this.onWorldInteractionCompleted('sad-npc');
     }
 
     createStressNpcZone (x: number, y: number)
@@ -834,6 +900,7 @@ export class Game extends Scene
 
             this.spawnDuckWaterLife();
             this.startDuckFamilyIdleGroup();
+            this.onWorldInteractionCompleted('duck-family');
         });
     }
 
@@ -976,6 +1043,8 @@ export class Game extends Scene
                 repeat: -1,
                 ease: 'Sine.easeInOut'
             });
+
+            this.onWorldInteractionCompleted('stress-npc');
         });
     }
 
@@ -1002,6 +1071,144 @@ export class Game extends Scene
             .setBlendMode(BlendModes.ADD)
             .setVisible(false)
             .setDepth(y - 1);
+
+        this.lampGlowOuter = this.add.circle(x, y - 8, 190, 0xfff0bf, 0.2)
+            .setBlendMode(BlendModes.SCREEN)
+            .setVisible(false)
+            .setDepth(y - 2);
+    }
+
+    bloomLampFlowers ()
+    {
+        const flowerLayout = [
+            { x: -92, y: 28, texture: 'flower-yellow' },
+            { x: -64, y: 44, texture: 'flower-pink' },
+            { x: -32, y: 30, texture: 'flower-blue' },
+            { x: 22, y: 34, texture: 'flower-yellow' },
+            { x: 56, y: 48, texture: 'flower-pink' },
+            { x: 88, y: 30, texture: 'flower-blue' },
+            { x: -16, y: 56, texture: 'flower-yellow' },
+            { x: 38, y: 62, texture: 'flower-pink' },
+            { x: -58, y: 66, texture: 'flower-blue' }
+        ];
+
+        flowerLayout.forEach((flowerData, index) =>
+        {
+            const flower = this.add.image(
+                this.lamp.x + flowerData.x,
+                this.lamp.y + flowerData.y,
+                flowerData.texture
+            )
+                .setAlpha(0)
+                .setScale(0.2)
+                .setDepth(this.lamp.y + flowerData.y + 4);
+
+            this.lampBloomFlowers.push(flower);
+
+            this.tweens.add({
+                targets: flower,
+                alpha: 1,
+                scale: 1,
+                duration: 360,
+                delay: index * 70,
+                ease: 'Back.easeOut'
+            });
+        });
+    }
+
+    onWorldInteractionCompleted (interactionId: string)
+    {
+        if (this.completedInteractions.has(interactionId))
+        {
+            return;
+        }
+
+        this.completedInteractions.add(interactionId);
+        this.worldRestoreLevel = Math.min(this.completedInteractions.size, 4);
+        this.applyWorldProgressVisuals(true);
+    }
+
+    applyWorldProgressVisuals (animated: boolean)
+    {
+        const progress = this.worldRestoreLevel / 4;
+        const duration = animated ? 900 : 0;
+
+        this.tweens.add({
+            targets: this.worldDarkOverlay,
+            alpha: 0.2 - (progress * 0.14),
+            duration,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: this.worldColdOverlay,
+            alpha: 0.12 - (progress * 0.08),
+            duration,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: this.worldWarmOverlay,
+            alpha: 0.02 + (progress * 0.16),
+            duration,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: [this.vignetteTop, this.vignetteBottom],
+            alpha: 0.18 - (progress * 0.11),
+            duration,
+            ease: 'Sine.easeOut'
+        });
+
+        if (this.worldRestoreLevel >= 1)
+        {
+            this.tweens.add({
+                targets: this.playerHopeGlow,
+                alpha: 0.11 + (progress * 0.08),
+                duration,
+                ease: 'Sine.easeOut'
+            });
+
+            this.startAmbientDecorMotion();
+        }
+    }
+
+    startAmbientDecorMotion ()
+    {
+        if (this.ambientMotionStarted)
+        {
+            return;
+        }
+
+        this.ambientMotionStarted = true;
+
+        this.ambientFogPatches.forEach((fog, index) =>
+        {
+            this.tweens.add({
+                targets: fog,
+                y: fog.y + (index % 2 === 0 ? 6 : -5),
+                duration: 6200 + (index * 700),
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        });
+
+        const trees = this.obstacles.getChildren()
+            .filter((obj) => (obj as Phaser.Physics.Arcade.Image).texture.key === 'tree-oak') as Phaser.Physics.Arcade.Image[];
+
+        trees.forEach((tree, index) =>
+        {
+            this.tweens.add({
+                targets: tree,
+                angle: index % 2 === 0 ? 1.2 : -1.2,
+                duration: 2100 + (index * 40),
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        });
     }
 
     createSadAtmosphere ()
@@ -1015,28 +1222,94 @@ export class Game extends Scene
 
         fogPatches.forEach((patch) =>
         {
-            this.add.ellipse(patch.x, patch.y, patch.width, patch.height, 0xc8d0d5, patch.alpha)
+            const fog = this.add.ellipse(patch.x, patch.y, patch.width, patch.height, 0xc8d0d5, patch.alpha)
                 .setDepth(1400);
+            this.ambientFogPatches.push(fog);
         });
 
-        this.add.ellipse(1380, 180, 620, 160, 0x8f969d, 0.18)
+        const topCloudA = this.add.ellipse(1380, 180, 620, 160, 0x8f969d, 0.18)
             .setDepth(1450);
-        this.add.ellipse(1710, 220, 300, 90, 0x959ba1, 0.12)
+        const topCloudB = this.add.ellipse(1710, 220, 300, 90, 0x959ba1, 0.12)
             .setDepth(1451);
+        this.ambientFogPatches.push(topCloudA, topCloudB);
 
-        this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x5d6772, 0.12)
+        this.worldColdOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x5d6772, 0.12)
             .setDepth(1490);
 
-        this.add.rectangle(512, 384, 1024, 768, 0x3f4952, 0.2)
+        this.worldWarmOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0xf2c874, 0.02)
+            .setBlendMode(BlendModes.SCREEN)
+            .setDepth(1491);
+
+        this.worldDarkOverlay = this.add.rectangle(512, 384, 1024, 768, 0x3f4952, 0.2)
             .setScrollFactor(0)
             .setDepth(3000);
 
-        this.add.rectangle(512, 60, 1024, 120, 0x2d3338, 0.18)
+        this.playerHopeGlow = this.add.circle(this.player.x, this.player.y, 140, 0xffe5a2, 0)
+            .setBlendMode(BlendModes.ADD)
+            .setDepth(3002);
+
+        this.vignetteTop = this.add.rectangle(512, 60, 1024, 120, 0x2d3338, 0.18)
             .setScrollFactor(0)
             .setDepth(3001);
-        this.add.rectangle(512, 708, 1024, 120, 0x2d3338, 0.12)
+        this.vignetteBottom = this.add.rectangle(512, 708, 1024, 120, 0x2d3338, 0.12)
             .setScrollFactor(0)
             .setDepth(3001);
+
+        this.applyWorldProgressVisuals(false);
+    }
+
+    createNpcComfortShadow (x: number, y: number)
+    {
+        // Dark emotional zone around the crying NPC that fades when the player approaches.
+        this.npcComfortShadowZone = this.add.ellipse(x, y, 420, 320, 0x12171d, 0.42)
+            .setDepth(y - 6);
+
+        this.npcComfortShadowRing = this.add.ellipse(x, y, 530, 410, 0x0d1117, 0.2)
+            .setDepth(y - 5);
+    }
+
+    updateNpcComfortShadowProgress ()
+    {
+        if (this.npcComfortShadowCleared || !this.npcComfortShadowZone || !this.npcComfortShadowRing || !this.npc)
+        {
+            return;
+        }
+
+        const distanceFromNpc = PhaserMath.Distance.Between(this.player.x, this.player.y, this.npc.x, this.npc.y);
+        const approachRadius = 180;
+
+        // As the player approaches the crying NPC, the shadow fades and then disappears.
+        const progress = PhaserMath.Clamp((approachRadius - distanceFromNpc) / approachRadius, 0, 1);
+        this.npcComfortShadowZone.setAlpha(0.42 * (1 - progress));
+        this.npcComfortShadowRing.setAlpha(0.2 * (1 - progress));
+
+        // Permanently clear shadow once the player is close enough to comfort the NPC.
+        if (distanceFromNpc <= this.npcTriggerDistance)
+        {
+            this.clearNpcComfortShadowPermanent();
+        }
+    }
+
+    clearNpcComfortShadowPermanent ()
+    {
+        if (this.npcComfortShadowCleared || !this.npcComfortShadowZone || !this.npcComfortShadowRing)
+        {
+            return;
+        }
+
+        this.npcComfortShadowCleared = true;
+
+        this.tweens.add({
+            targets: [this.npcComfortShadowZone, this.npcComfortShadowRing],
+            alpha: 0,
+            duration: 260,
+            ease: 'Sine.easeOut',
+            onComplete: () =>
+            {
+                this.npcComfortShadowZone.destroy();
+                this.npcComfortShadowRing.destroy();
+            }
+        });
     }
 
     revealLampIfDiscovered ()
@@ -1064,24 +1337,47 @@ export class Game extends Scene
         this.lampActivated = true;
         this.lamp.setTexture('lamp-on');
         this.lampGlow.setVisible(true);
+        this.lampGlowOuter.setVisible(true);
         this.lampGlow.setScale(0.5);
+        this.lampGlowOuter.setScale(0.4);
 
         this.tweens.add({
             targets: this.lampGlow,
-            alpha: { from: 0.15, to: 0.42 },
-            scale: { from: 0.5, to: 1 },
-            duration: 500,
+            alpha: { from: 0.2, to: 0.58 },
+            scale: { from: 0.5, to: 1.25 },
+            duration: 620,
             ease: 'Sine.easeOut'
         });
 
         this.tweens.add({
             targets: this.lampGlow,
-            alpha: { from: 0.42, to: 0.28 },
-            duration: 900,
+            alpha: { from: 0.58, to: 0.35 },
+            duration: 960,
             yoyo: true,
             repeat: -1,
             ease: 'Sine.easeInOut'
         });
+
+        this.tweens.add({
+            targets: this.lampGlowOuter,
+            alpha: { from: 0.08, to: 0.34 },
+            scale: { from: 0.4, to: 1.12 },
+            duration: 700,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: this.lampGlowOuter,
+            alpha: { from: 0.34, to: 0.18 },
+            duration: 1250,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        this.bloomLampFlowers();
+
+        this.onWorldInteractionCompleted('lamp');
     }
 
     checkLampProximity ()
@@ -1227,6 +1523,11 @@ export class Game extends Scene
         }
 
         this.player.setDepth(this.player.y);
+        if (this.playerHopeGlow)
+        {
+            this.playerHopeGlow.setPosition(this.player.x, this.player.y);
+        }
+        this.updateNpcComfortShadowProgress();
         if (this.npc)
         {
             this.npc.setDepth(this.npc.y);

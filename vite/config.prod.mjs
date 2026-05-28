@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const basePath = process.env.VITE_BASE_PATH || './';
+
 const phasermsg = () => {
     return {
         name: 'phasermsg',
@@ -18,7 +20,7 @@ const phasermsg = () => {
 }
 
 export default defineConfig({
-    base: './',
+    base: basePath,
     plugins: [
         react(),
         phasermsg()

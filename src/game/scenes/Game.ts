@@ -57,6 +57,8 @@ export class Game extends Scene
     finalSequenceCompleted: boolean;
     finalMessageText: Phaser.GameObjects.Text;
     finalMessageFadeOverlay: Phaser.GameObjects.Rectangle;
+    finalRedMapBackground: Phaser.GameObjects.Rectangle | null;
+    finalRedStateLocked: boolean;
     worldLifeMotes: Phaser.GameObjects.Arc[];
     stressNpcCalmWalkTween: Phaser.Tweens.Tween | null;
     npcComfortShadowZone: Phaser.GameObjects.Ellipse;
@@ -103,6 +105,8 @@ export class Game extends Scene
         this.playerInputLocked = false;
         this.finalSequenceStarted = false;
         this.finalSequenceCompleted = false;
+        this.finalRedMapBackground = null;
+        this.finalRedStateLocked = false;
         this.worldLifeMotes = [];
         this.stressNpcCalmWalkTween = null;
         this.npcComfortShadowCleared = false;
@@ -1222,6 +1226,8 @@ export class Game extends Scene
             return;
         }
 
+        this.applyFinalNatureLook();
+
         this.finalMessageFadeOverlay = this.add.rectangle(512, 384, 1024, 768, 0xf4f6df, 0)
             .setScrollFactor(0)
             .setDepth(4990);
@@ -1262,6 +1268,92 @@ export class Game extends Scene
             delay: 320,
             ease: 'Sine.easeOut'
         });
+    }
+
+    applyFinalNatureLook ()
+    {
+        this.finalRedStateLocked = true;
+
+        // Stop any in-flight transitions that could bring back previous map colors.
+        this.tweens.killTweensOf(this.grassTiles);
+        this.tweens.killTweensOf(this.ambientFogPatches);
+        this.tweens.killTweensOf([this.worldDarkOverlay, this.worldColdOverlay, this.worldWarmOverlay, this.vignetteTop, this.vignetteBottom]);
+        if (this.worldReviveTintOverlay)
+        {
+            this.tweens.killTweensOf(this.worldReviveTintOverlay);
+        }
+
+        // At final message time, hide map-ground layers and replace them with persistent red.
+        this.tweens.add({
+            targets: [this.worldDarkOverlay, this.worldColdOverlay, this.worldWarmOverlay],
+            alpha: 0,
+            duration: 500,
+            ease: 'Sine.easeOut'
+        });
+
+        this.tweens.add({
+            targets: [this.vignetteTop, this.vignetteBottom],
+            alpha: 0,
+            duration: 500,
+            ease: 'Sine.easeOut'
+        });
+
+        this.ambientFogPatches.forEach((fog) =>
+        {
+            this.tweens.add({
+                targets: fog,
+                alpha: 0,
+                duration: 500,
+                ease: 'Sine.easeOut'
+            });
+        });
+
+        this.grassTiles.forEach((tile) =>
+        {
+            tile.clearTint();
+            this.tweens.add({
+                targets: tile,
+                alpha: 0,
+                duration: 320,
+                ease: 'Sine.easeOut'
+            });
+        });
+
+        if (!this.finalRedMapBackground)
+        {
+            this.finalRedMapBackground = this.add.rectangle(
+                this.worldWidth / 2,
+                this.worldHeight / 2,
+                this.worldWidth,
+                this.worldHeight,
+                0xb4161b,
+                0
+            ).setDepth(-980);
+        }
+        else
+        {
+            this.finalRedMapBackground.setFillStyle(0xb4161b, 0);
+        }
+
+        this.tweens.add({
+            targets: this.finalRedMapBackground,
+            alpha: 1,
+            duration: 420,
+            ease: 'Sine.easeOut'
+        });
+
+        if (this.worldReviveTintOverlay)
+        {
+            this.tweens.add({
+                targets: this.worldReviveTintOverlay,
+                alpha: 0,
+                duration: 500,
+                ease: 'Sine.easeOut'
+            });
+        }
+
+        this.cameras.main.setBackgroundColor(0x8f1116);
+        this.forceMapVisualRefresh();
     }
 
     checkStressNpcProximity ()
@@ -1449,7 +1541,7 @@ export class Game extends Scene
 
     applyWorldProgressVisuals (animated: boolean)
     {
-        if (this.worldFullyRevived)
+        if (this.worldFullyRevived || this.finalRedStateLocked)
         {
             return;
         }
@@ -1505,7 +1597,7 @@ export class Game extends Scene
 
     activateFullMapRevival ()
     {
-        if (this.worldFullyRevived)
+        if (this.worldFullyRevived || this.finalRedStateLocked)
         {
             return;
         }
@@ -1521,7 +1613,7 @@ export class Game extends Scene
                 duration: 1400,
                 ease: 'Sine.easeOut'
             });
-            tile.setTint(0x9eff6f);
+            tile.setTint(0x84c86a);
         });
 
         this.obstacles.getChildren().forEach((obj) =>
@@ -1561,7 +1653,7 @@ export class Game extends Scene
 
         this.tweens.add({
             targets: this.worldWarmOverlay,
-            alpha: 0.32,
+            alpha: 0.12,
             duration: 1400,
             ease: 'Sine.easeOut'
         });
@@ -1585,9 +1677,9 @@ export class Game extends Scene
             onUpdate: (tween) =>
             {
                 const t = tween.getValue() / 100;
-                const r = Math.round(PhaserMath.Linear(0x1c, 0x82, t));
-                const g = Math.round(PhaserMath.Linear(0x26, 0xe9, t));
-                const b = Math.round(PhaserMath.Linear(0x2e, 0x63, t));
+                const r = Math.round(PhaserMath.Linear(0x1c, 0x79, t));
+                const g = Math.round(PhaserMath.Linear(0x26, 0xb9, t));
+                const b = Math.round(PhaserMath.Linear(0x2e, 0x6a, t));
                 const color = (r << 16) | (g << 8) | b;
                 this.cameras.main.setBackgroundColor(color);
             }

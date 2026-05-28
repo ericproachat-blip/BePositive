@@ -123,7 +123,7 @@ const ReactComponent = () => {
     const phaserRef = useRef<IRefPhaserGame>(); // you can access to this ref from phaserRef.current
 
     const onCurrentActiveScene = (scene: Phaser.Scene) => {
-    
+
         // This is invoked
 
     }
@@ -189,7 +189,7 @@ This project is configured for GitHub Pages deployment using GitHub Actions.
 ### Automatic deployment
 
 - The workflow file is in `.github/workflows/deploy-pages.yml`.
-- Every push to the `main` branch triggers a new deployment.
+- Every push to the `main` or `master` branch triggers a new deployment.
 - You can also run it manually from the `Actions` tab.
 
 ### Base path handling

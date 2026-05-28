@@ -1283,7 +1283,7 @@ export class Game extends Scene
             this.tweens.killTweensOf(this.worldReviveTintOverlay);
         }
 
-        // At final message time, hide map-ground layers and replace them with persistent red.
+        // At final message time, remove grass and force a solid vivid-green background.
         this.tweens.add({
             targets: [this.worldDarkOverlay, this.worldColdOverlay, this.worldWarmOverlay],
             alpha: 0,
@@ -1300,23 +1300,15 @@ export class Game extends Scene
 
         this.ambientFogPatches.forEach((fog) =>
         {
-            this.tweens.add({
-                targets: fog,
-                alpha: 0,
-                duration: 500,
-                ease: 'Sine.easeOut'
-            });
+            fog.setAlpha(0);
+            fog.setVisible(false);
         });
 
         this.grassTiles.forEach((tile) =>
         {
             tile.clearTint();
-            this.tweens.add({
-                targets: tile,
-                alpha: 0,
-                duration: 320,
-                ease: 'Sine.easeOut'
-            });
+            tile.setAlpha(0);
+            tile.setVisible(false);
         });
 
         if (!this.finalRedMapBackground)
@@ -1326,19 +1318,19 @@ export class Game extends Scene
                 this.worldHeight / 2,
                 this.worldWidth,
                 this.worldHeight,
-                0xb4161b,
+                0x39ff14,
                 0
             ).setDepth(-980);
         }
         else
         {
-            this.finalRedMapBackground.setFillStyle(0xb4161b, 0);
+            this.finalRedMapBackground.setFillStyle(0x39ff14, 0);
         }
 
         this.tweens.add({
             targets: this.finalRedMapBackground,
             alpha: 1,
-            duration: 420,
+            duration: 260,
             ease: 'Sine.easeOut'
         });
 
@@ -1352,7 +1344,7 @@ export class Game extends Scene
             });
         }
 
-        this.cameras.main.setBackgroundColor(0x8f1116);
+        this.cameras.main.setBackgroundColor(0x2de600);
         this.forceMapVisualRefresh();
     }
 

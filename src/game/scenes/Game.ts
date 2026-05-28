@@ -162,6 +162,14 @@ export class Game extends Scene
             strokeThickness: 4
         }).setScrollFactor(0).setDepth(2000);
 
+        this.add.text(18, 48, 'Mobile: toucher et maintenir pour se deplacer', {
+            fontFamily: 'Arial',
+            fontSize: 16,
+            color: '#d7dde0',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setScrollFactor(0).setDepth(2000);
+
         EventBus.emit('current-scene-ready', this);
     }
 
@@ -2083,22 +2091,50 @@ export class Game extends Scene
         const body = this.player.body as Phaser.Physics.Arcade.Body;
         body.setVelocity(0);
 
+        const keyboardMovingLeft = this.cursors.left?.isDown;
+        const keyboardMovingRight = this.cursors.right?.isDown;
+        const keyboardMovingUp = this.cursors.up?.isDown;
+        const keyboardMovingDown = this.cursors.down?.isDown;
+        const hasKeyboardInput = keyboardMovingLeft || keyboardMovingRight || keyboardMovingUp || keyboardMovingDown;
+
         // 4-direction movement only (no jump, no diagonal) at constant speed.
-        if (this.cursors.left?.isDown)
+        if (keyboardMovingLeft)
         {
             body.setVelocityX(-this.moveSpeed);
         }
-        else if (this.cursors.right?.isDown)
+        else if (keyboardMovingRight)
         {
             body.setVelocityX(this.moveSpeed);
         }
-        else if (this.cursors.up?.isDown)
+        else if (keyboardMovingUp)
         {
             body.setVelocityY(-this.moveSpeed);
         }
-        else if (this.cursors.down?.isDown)
+        else if (keyboardMovingDown)
         {
             body.setVelocityY(this.moveSpeed);
+        }
+        else if (this.input.activePointer.isDown)
+        {
+            const pointerWorldPosition = this.input.activePointer.positionToCamera(this.cameras.main);
+            const deltaX = pointerWorldPosition.x - this.player.x;
+            const deltaY = pointerWorldPosition.y - this.player.y;
+            const deadZone = 18;
+
+            if (!hasKeyboardInput)
+            {
+                if (Math.abs(deltaX) > Math.abs(deltaY))
+                {
+                    if (Math.abs(deltaX) > deadZone)
+                    {
+                        body.setVelocityX(deltaX < 0 ? -this.moveSpeed : this.moveSpeed);
+                    }
+                }
+                else if (Math.abs(deltaY) > deadZone)
+                {
+                    body.setVelocityY(deltaY < 0 ? -this.moveSpeed : this.moveSpeed);
+                }
+            }
         }
 
         this.player.setDepth(this.player.y);

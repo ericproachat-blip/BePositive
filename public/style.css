@@ -18,6 +18,7 @@ body {
     color: var(--text);
     font-family: "Trebuchet MS", "Gill Sans", sans-serif;
     background: radial-gradient(circle at 20% 10%, #ffffff 0%, var(--bg-top) 45%, var(--bg-bottom) 100%);
+    overscroll-behavior: none;
 }
 
 #root,
@@ -40,12 +41,14 @@ body {
 
 #game-container {
     width: var(--card-width);
+    touch-action: none;
 }
 
 #game-container canvas {
     display: block;
     width: 100% !important;
     height: auto !important;
+    touch-action: none;
 }
 
 .hero-content {
@@ -93,4 +96,20 @@ body {
 
 .start-button:active {
     transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+    :root {
+        --card-width: min(100vw, calc(100vh * 4 / 3));
+    }
+
+    .hero-screen,
+    .game-screen {
+        padding: 0;
+    }
+
+    .hero-content {
+        border-radius: 0;
+        padding: 32px 20px;
+    }
 }

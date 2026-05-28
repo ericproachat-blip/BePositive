@@ -1274,6 +1274,8 @@ export class Game extends Scene
     {
         this.finalRedStateLocked = true;
 
+        this.createFinalGreenGrassTexture();
+
         // Stop any in-flight transitions that could bring back previous map colors.
         this.tweens.killTweensOf(this.grassTiles);
         this.tweens.killTweensOf(this.ambientFogPatches);
@@ -1306,9 +1308,10 @@ export class Game extends Scene
 
         this.grassTiles.forEach((tile) =>
         {
+            tile.setTexture('grass-tile-final-vivid');
             tile.clearTint();
-            tile.setAlpha(0);
-            tile.setVisible(false);
+            tile.setAlpha(1);
+            tile.setVisible(true);
         });
 
         if (!this.finalRedMapBackground)
@@ -1318,13 +1321,13 @@ export class Game extends Scene
                 this.worldHeight / 2,
                 this.worldWidth,
                 this.worldHeight,
-                0x39ff14,
+                0x28b80f,
                 0
             ).setDepth(-980);
         }
         else
         {
-            this.finalRedMapBackground.setFillStyle(0x39ff14, 0);
+            this.finalRedMapBackground.setFillStyle(0x28b80f, 0);
         }
 
         this.tweens.add({
@@ -1344,8 +1347,32 @@ export class Game extends Scene
             });
         }
 
-        this.cameras.main.setBackgroundColor(0x2de600);
+        this.cameras.main.setBackgroundColor(0x239f11);
         this.forceMapVisualRefresh();
+    }
+
+    createFinalGreenGrassTexture ()
+    {
+        if (this.textures.exists('grass-tile-final-vivid'))
+        {
+            return;
+        }
+
+        const grassFinal = this.add.graphics();
+        grassFinal.fillStyle(0x28b80f, 1);
+        grassFinal.fillRect(0, 0, 64, 64);
+
+        grassFinal.fillStyle(0x22970d, 1);
+        grassFinal.fillRect(0, 0, 64, 30);
+
+        grassFinal.fillStyle(0x44cc2d, 1);
+        grassFinal.fillRect(10, 8, 6, 6);
+        grassFinal.fillRect(40, 18, 5, 5);
+        grassFinal.fillRect(24, 40, 6, 6);
+        grassFinal.fillRect(50, 48, 4, 4);
+
+        grassFinal.generateTexture('grass-tile-final-vivid', 64, 64);
+        grassFinal.destroy();
     }
 
     checkStressNpcProximity ()

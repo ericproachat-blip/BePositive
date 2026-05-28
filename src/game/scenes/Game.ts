@@ -2114,9 +2114,10 @@ export class Game extends Scene
         {
             body.setVelocityY(this.moveSpeed);
         }
-        else if (this.input.activePointer.isDown)
+        else if (this.input.activePointer?.isDown)
         {
-            const pointerWorldPosition = this.input.activePointer.positionToCamera(this.cameras.main);
+            const pointer = this.input.activePointer;
+            const pointerWorldPosition = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
             const deltaX = pointerWorldPosition.x - this.player.x;
             const deltaY = pointerWorldPosition.y - this.player.y;
             const deadZone = 18;

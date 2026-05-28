@@ -259,8 +259,27 @@ export class Game extends Scene
             player.fillStyle(0x2b2b2b, 0.28);
             player.fillEllipse(24, 44, 26, 10);
 
+            player.fillStyle(0x3a2b1f, 1);
+            player.fillRect(16, 5, 16, 4);
+
             player.fillStyle(0xf4c9a2, 1);
             player.fillCircle(24, 12, 9);
+
+            player.fillStyle(0x1f1f1f, 1);
+            player.fillCircle(20, 11, 1.5);
+            player.fillCircle(28, 11, 1.5);
+
+            // Smile: a small crescent made from two ellipses.
+            player.fillStyle(0xa43a4f, 1);
+            player.fillEllipse(24, 16, 9, 5);
+            player.fillStyle(0xf4c9a2, 1);
+            player.fillEllipse(24, 14.5, 9, 4.2);
+
+            player.fillStyle(0xf4c9a2, 1);
+            player.fillRect(9, 24, 4, 13);
+            player.fillRect(35, 24, 4, 13);
+            player.fillCircle(11, 38, 2.2);
+            player.fillCircle(37, 38, 2.2);
 
             player.fillStyle(0x2f3f9e, 1);
             player.fillRect(13, 22, 22, 15);
@@ -921,6 +940,9 @@ export class Game extends Scene
             this.startDuckFamilyIdleGroup();
             this.onWorldInteractionCompleted('duck-family');
 
+            // Force immediate visual refresh right after duck sequence completion.
+            this.forceMapVisualRefresh();
+
             // Immediate global map color change after duck reunion.
             this.activateFullMapRevival();
 
@@ -1022,8 +1044,11 @@ export class Game extends Scene
             }
 
             // Saturation / light increase to full progression.
-            this.worldRestoreLevel = 4;
-            this.applyWorldProgressVisuals(true);
+            if (!this.worldFullyRevived)
+            {
+                this.worldRestoreLevel = 4;
+                this.applyWorldProgressVisuals(true);
+            }
 
             this.time.delayedCall(400, () =>
             {
@@ -1424,6 +1449,11 @@ export class Game extends Scene
 
     applyWorldProgressVisuals (animated: boolean)
     {
+        if (this.worldFullyRevived)
+        {
+            return;
+        }
+
         const progress = this.worldRestoreLevel / 4;
         const duration = animated ? 900 : 0;
 
@@ -1482,53 +1512,107 @@ export class Game extends Scene
 
         this.worldFullyRevived = true;
 
-        // Global simultaneous tint for the full map while the overlays fade in smoothly.
+        // Final state: joyful, bright light-green world.
         this.grassTiles.forEach((tile) =>
         {
-            tile.setTint(0x7be85f);
+            this.tweens.add({
+                targets: tile,
+                alpha: 1,
+                duration: 1400,
+                ease: 'Sine.easeOut'
+            });
+            tile.setTint(0x9eff6f);
+        });
+
+        this.obstacles.getChildren().forEach((obj) =>
+        {
+            this.tweens.add({
+                targets: obj,
+                alpha: 1,
+                duration: 1400,
+                ease: 'Sine.easeOut'
+            });
         });
 
         this.tweens.add({
             targets: [this.worldDarkOverlay, this.worldColdOverlay],
-            alpha: 0.01,
-            duration: 1600,
+            alpha: 0,
+            duration: 1400,
             ease: 'Sine.easeOut'
+        });
+
+        // Remove any remaining gray veil at the end.
+        this.tweens.add({
+            targets: [this.vignetteTop, this.vignetteBottom],
+            alpha: 0,
+            duration: 1400,
+            ease: 'Sine.easeOut'
+        });
+
+        this.ambientFogPatches.forEach((fog) =>
+        {
+            this.tweens.add({
+                targets: fog,
+                alpha: 0,
+                duration: 1400,
+                ease: 'Sine.easeOut'
+            });
         });
 
         this.tweens.add({
             targets: this.worldWarmOverlay,
-            alpha: 0.3,
-            duration: 1600,
+            alpha: 0.32,
+            duration: 1400,
             ease: 'Sine.easeOut'
         });
 
-        this.worldReviveTintOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0x79f05e, 0)
-            .setBlendMode(BlendModes.NORMAL)
+        this.worldReviveTintOverlay = this.add.rectangle(this.worldWidth / 2, this.worldHeight / 2, this.worldWidth, this.worldHeight, 0xa7ff70, 0)
+            .setBlendMode(BlendModes.SCREEN)
             .setDepth(1492);
 
         this.tweens.add({
             targets: this.worldReviveTintOverlay,
-            alpha: 0.2,
-            duration: 1600,
+            alpha: 0.46,
+            duration: 1400,
             ease: 'Sine.easeOut'
         });
 
         this.tweens.addCounter({
             from: 0,
             to: 100,
-            duration: 1600,
+            duration: 1400,
             ease: 'Sine.easeOut',
             onUpdate: (tween) =>
             {
                 const t = tween.getValue() / 100;
-                const r = Math.round(PhaserMath.Linear(0x1c, 0x67, t));
-                const g = Math.round(PhaserMath.Linear(0x26, 0xbf, t));
-                const b = Math.round(PhaserMath.Linear(0x2e, 0x58, t));
+                const r = Math.round(PhaserMath.Linear(0x1c, 0x82, t));
+                const g = Math.round(PhaserMath.Linear(0x26, 0xe9, t));
+                const b = Math.round(PhaserMath.Linear(0x2e, 0x63, t));
                 const color = (r << 16) | (g << 8) | b;
                 this.cameras.main.setBackgroundColor(color);
             }
         });
 
+        this.forceMapVisualRefresh();
+
+    }
+
+    forceMapVisualRefresh ()
+    {
+        // Explicitly force a render refresh for map layers and camera after visual state changes.
+        this.children.depthSort();
+
+        const cam = this.cameras.main as Phaser.Cameras.Scene2D.Camera & { dirty?: boolean };
+        cam.setScroll(cam.scrollX, cam.scrollY);
+        cam.dirty = true;
+
+        // Apply a second immediate pass on next tick to avoid relying on implicit player updates.
+        this.time.delayedCall(0, () =>
+        {
+            this.children.depthSort();
+            cam.setScroll(cam.scrollX, cam.scrollY);
+            cam.dirty = true;
+        });
     }
 
     startAmbientDecorMotion ()

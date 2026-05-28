@@ -1,48 +1,96 @@
+:root {
+    --bg-top: #fff7e8;
+    --bg-bottom: #ffe1c6;
+    --title: #0f172a;
+    --text: #374151;
+    --button-bg: #0f172a;
+    --button-text: #ffffff;
+    --card-width: min(1024px, calc(100vw - 32px), calc((100vh - 32px) * 4 / 3));
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
-    padding: 0;
-    color: rgba(255, 255, 255, 0.87);
-    background-color: #000000; 
-    font-family: Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+    color: var(--text);
+    font-family: "Trebuchet MS", "Gill Sans", sans-serif;
+    background: radial-gradient(circle at 20% 10%, #ffffff 0%, var(--bg-top) 45%, var(--bg-bottom) 100%);
 }
 
+#root,
 #app {
-    width: 100%;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    min-height: 100vh;
 }
 
-.spritePosition {
-    margin: 10px 0 0 10px;
-    font-size: 0.8em;
+.hero-screen {
+    display: grid;
+    place-items: center;
+    padding: 24px;
 }
 
-.button {
-    width: 140px;
-    margin: 10px;
-    padding: 10px;
-    background-color: #000000;
-    color: rgba(255, 255, 255, 0.87);
-    border: 1px solid rgba(255, 255, 255, 0.87);
+.game-screen {
+    display: grid;
+    place-items: center;
+    padding: 12px;
+    background: #000000;
+}
+
+#game-container {
+    width: var(--card-width);
+}
+
+#game-container canvas {
+    display: block;
+    width: 100% !important;
+    height: auto !important;
+}
+
+.hero-content {
+    text-align: center;
+    width: var(--card-width);
+    aspect-ratio: 4 / 3;
+    padding: 40px 24px;
+    border-radius: 20px;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(4px);
+}
+
+.hero-content h1 {
+    margin: 0;
+    color: var(--title);
+    letter-spacing: 0.08em;
+    font-size: clamp(2rem, 7vw, 4.5rem);
+    line-height: 1.05;
+}
+
+.hero-content p {
+    margin: 18px 0 34px;
+    font-size: clamp(1rem, 2.6vw, 1.5rem);
+}
+
+.start-button {
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 34px;
+    font-size: 1rem;
+    font-weight: 700;
+    background: var(--button-bg);
+    color: var(--button-text);
     cursor: pointer;
-    transition: all 0.3s;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
 
-    &:hover {
-        border: 1px solid #0ec3c9;
-        color: #0ec3c9;
-    }
+.start-button:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+}
 
-    &:active {
-        background-color: #0ec3c9;
-    }
-
-    /* Disabled styles */
-    &:disabled {
-        cursor: not-allowed;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        color: rgba(255, 255, 255, 0.3);
-    }
+.start-button:active {
+    transform: translateY(0);
 }

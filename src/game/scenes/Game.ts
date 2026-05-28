@@ -147,6 +147,7 @@ export class Game extends Scene
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.input.keyboard?.addCapture(['UP', 'DOWN', 'LEFT', 'RIGHT']);
+        this.input.addPointer(1);
 
         this.camera.startFollow(this.player, true, 0.14, 0.14);
         this.camera.roundPixels = true;
@@ -2099,6 +2100,26 @@ export class Game extends Scene
         else if (this.cursors.down?.isDown)
         {
             body.setVelocityY(this.moveSpeed);
+        }
+        else if (this.input.activePointer?.isDown)
+        {
+            const pointer = this.input.activePointer;
+            const pointerWorldPosition = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+            const deltaX = pointerWorldPosition.x - this.player.x;
+            const deltaY = pointerWorldPosition.y - this.player.y;
+            const deadZone = 18;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY))
+            {
+                if (Math.abs(deltaX) > deadZone)
+                {
+                    body.setVelocityX(deltaX < 0 ? -this.moveSpeed : this.moveSpeed);
+                }
+            }
+            else if (Math.abs(deltaY) > deadZone)
+            {
+                body.setVelocityY(deltaY < 0 ? -this.moveSpeed : this.moveSpeed);
+            }
         }
 
         this.player.setDepth(this.player.y);

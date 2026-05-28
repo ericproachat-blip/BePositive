@@ -40,12 +40,14 @@ body {
 
 #game-container {
     width: var(--card-width);
+    touch-action: none;
 }
 
 #game-container canvas {
     display: block;
     width: 100% !important;
     height: auto !important;
+    touch-action: none;
 }
 
 .hero-content {
